@@ -1,0 +1,5 @@
+- Run `01_scrape_reference.py` to download the standard chapters from 1-498
+- Run `02_scrape_convert.py` to download the converted chapters from 499-end
+- Run `03_edit_orchestrator.py` to rewrite the converted chapters into standard Vietnamese tongue
+- Run `04_combine.py` to combine all chapters into a final markdown doc
+- Run `05_to_epub.sh` to convert from markdown doc into the final epub file
