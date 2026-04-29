@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boktrans-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: boktrans-bot
+  template:
+    metadata:
+      labels:
+        app: boktrans-bot
+    spec:
+      containers:
+        - name: bot
+          image: boktrans-bot:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: boktrans-config
+            - secretRef:
+                name: boktrans-secret
+          volumeMounts:
+            - name: jobs
+              mountPath: /app/jobs
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: jobs
+          persistentVolumeClaim:
+            claimName: boktrans-jobs-pvc
