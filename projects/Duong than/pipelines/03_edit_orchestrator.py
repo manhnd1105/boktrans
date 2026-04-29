@@ -13,6 +13,7 @@ Requirements: pip install langchain langchain-openai
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -25,11 +26,17 @@ TESTS_DIR = SCRIPT_DIR / "tests"
 PROMPT_FILE = SCRIPT_DIR / "prompts" / "edit_style_match.md"
 STATE_FILE = SCRIPT_DIR / "state.json"
 
-# Model config — adjust to match your local endpoint
-MODEL_NAME = "gemini/gemini-2.5-flash"
-MODEL_PROVIDER = "openai"
-MODEL_BASE_URL = "http://localhost:20128/v1"
-MODEL_API_KEY = "anything"
+# Model config — override via environment variables
+MODELS = [
+    "gemini/gemini-2.5-flash",
+    "kc/stepfun/step-3.5-flash:free",
+    "kc/openrouter/free",
+    "kc/kilo-auto/free",
+]
+MODEL_NAME = os.environ.get("MODEL_NAME", MODELS[2])
+MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "openai")
+MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://localhost:20128/v1")
+MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "anything")
 
 REFERENCE_CHAPTERS = [1, 250, 498]  # injected as style examples
 CONVERT_MARKER = "<!-- source: convert -->"
@@ -72,7 +79,7 @@ def is_too_similar(original: str, edited: str) -> bool:
 
 def pending_chapters() -> list[int]:
     state = load_state()
-    done = set(state["completed"]) | set(state["failed"])
+    done = set(state["completed"])  # failed chapters are retried on the next run
     result = []
     for path in sorted(INPUT_DIR.glob("ch_*.md")):
         if CONVERT_MARKER not in path.read_text(encoding="utf-8"):
@@ -85,14 +92,14 @@ def pending_chapters() -> list[int]:
     return result
 
 
-def make_model():
-    """Instantiate the LangChain chat model from the constants above."""
+def make_model(model_name: str):
+    """Instantiate the LangChain chat model for the given model name."""
     try:
         from langchain.chat_models import init_chat_model
     except ImportError:
         sys.exit("langchain not installed — run: pip install langchain langchain-openai")
     return init_chat_model(
-        model=MODEL_NAME,
+        model=model_name,
         model_provider=MODEL_PROVIDER,
         base_url=MODEL_BASE_URL,
         openai_api_key=MODEL_API_KEY,
@@ -108,6 +115,22 @@ def call_model(model, template: str, reference_text: str, chapter_text: str) -> 
     ]
     response = model.invoke(messages)
     return response.content.strip()
+
+
+def call_model_with_fallback(template: str, reference_text: str, chapter_text: str) -> str:
+    """Try each model in MODELS in order; return the first successful response."""
+    last_exc: Exception | None = None
+    for model_name in MODELS:
+        try:
+            model = make_model(model_name)
+            result = call_model(model, template, reference_text, chapter_text)
+            if model_name != MODEL_NAME:
+                print(f"[fallback: used {model_name}]", end=" ")
+            return result
+        except Exception as e:
+            print(f"\n[fallback] {model_name} failed: {e}", end=" ")
+            last_exc = e
+    raise RuntimeError(f"All models exhausted. Last error: {last_exc}") from last_exc
 
 
 def run_test():
@@ -146,10 +169,9 @@ def run_dry_run():
 
     print(f"[dry-run] Chapter {num} ({len(chapter_text)} chars), "
           f"reference {len(reference_text)} chars")
-    print(f"[dry-run] Model: {MODEL_NAME} @ {MODEL_BASE_URL}")
+    print(f"[dry-run] Model: {MODEL_NAME} (with fallback) @ {MODEL_BASE_URL}")
 
-    model = make_model()
-    edited = call_model(model, template, reference_text, chapter_text)
+    edited = call_model_with_fallback(template, reference_text, chapter_text)
 
     print(f"\n[dry-run] Edited output (first 500 chars):\n{edited[:500]}...")
     print("\n[dry-run] File NOT written — dry-run mode")
@@ -161,12 +183,11 @@ def run_full():
     if not reference_text.strip():
         sys.exit("Reference chapters not found. Run pipeline 01 first.")
 
-    model = make_model()
     state = load_state()
     pending = pending_chapters()
 
     print(f"Pending chapters: {len(pending)}")
-    print(f"Model: {MODEL_NAME} @ {MODEL_BASE_URL}")
+    print(f"Model: {MODEL_NAME} (with fallback) @ {MODEL_BASE_URL}")
     if not pending:
         print("Nothing to do.")
         return
@@ -174,9 +195,14 @@ def run_full():
     for num in pending:
         path = INPUT_DIR / f"ch_{num:03d}.md"
         chapter_text = path.read_text(encoding="utf-8")
-        print(f"  Editing chapter {num}...", end=" ", flush=True)
+        retrying = num in state["failed"]
+        label = "Retrying" if retrying else "Editing"
+        if retrying:
+            state["failed"].remove(num)
+            save_state(state)
+        print(f"  {label} chapter {num}...", end=" ", flush=True)
         try:
-            edited = call_model(model, template, reference_text, chapter_text)
+            edited = call_model_with_fallback(template, reference_text, chapter_text)
             if is_too_similar(chapter_text, edited):
                 state["failed"].append(num)
                 save_state(state)
@@ -188,6 +214,7 @@ def run_full():
             state["completed"].append(num)
             save_state(state)
             print("done")
+
         except Exception as e:
             state["failed"].append(num)
             save_state(state)
