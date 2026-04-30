@@ -71,6 +71,12 @@ When a project has two tiers of source content — a standard translation (high 
 - The prompt must make this expectation explicit. Include concrete examples from the standard chapters and instruct the model to rewrite — not copy — the converted text.
 - After a dry-run, manually diff the input and output before committing to the full batch. If the diff is trivial, fix the prompt first.
 
+## Secrets and environment config
+
+- **Never read or edit `.env` files.** They contain real secrets (API keys, tokens). Treat them as off-limits.
+- To suggest a config change, edit `.env.template` instead — use dummy placeholder values (e.g. `your-api-key-here`) and add a comment explaining what the value should be.
+- When explaining how to apply a change, instruct the user to copy the relevant line from `.env.template` into their own `.env` and fill in the real value.
+
 ## Working on a project
 
 - Always read the project's `TODOs.md` first for context, status, and task breakdown.

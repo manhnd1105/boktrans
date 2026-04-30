@@ -16,7 +16,7 @@ MODELS = [
 ]
 MODEL_NAME = os.environ.get("MODEL_NAME", MODELS[2])
 MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "openai")
-MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://localhost:20128/v1")
+MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://host.docker.internal:20128/v1")
 MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "anything")
 
 
@@ -88,6 +88,7 @@ def translate_all(
     if total == 0:
         raise RuntimeError(f"No chapters found in {input_dir}")
 
+    progress_cb("Configured model: %s (%s, %s)" % (MODEL_NAME, MODEL_PROVIDER, MODEL_BASE_URL))
     translated = 0
     for i, path in enumerate(chapter_files, start=1):
         out = output_dir / path.name

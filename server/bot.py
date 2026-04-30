@@ -46,7 +46,6 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"Đã nhận yêu cầu:\n{book_url}{filter_note}\n\nTôi sẽ thông báo khi hoàn thành."
     )
     logger.info("Received translation request: %s%s", book_url, filter_note)
-
     loop = asyncio.get_event_loop()
 
     def run() -> None:
