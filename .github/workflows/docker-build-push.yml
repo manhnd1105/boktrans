@@ -1,9 +1,22 @@
 name: Build and Push Docker Image
 
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
+  
 jobs:
   build-and-push:
     runs-on: self-hosted
