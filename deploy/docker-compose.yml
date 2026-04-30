@@ -1,9 +1,11 @@
 services:
   bot:
-    build: .
+    build:
+      context: ..
+      dockerfile: src/Dockerfile
     restart: unless-stopped
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./jobs:/app/jobs
+      - ../dist/jobs:/app/jobs

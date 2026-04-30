@@ -1,0 +1,6 @@
+tests/
+deploy/
+dist/
+.git/
+.claude/
+projects/

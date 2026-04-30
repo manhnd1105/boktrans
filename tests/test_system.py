@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import pipeline
+import pipeline as pipeline
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
