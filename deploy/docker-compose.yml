@@ -5,7 +5,10 @@ services:
       dockerfile: src/Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      - LOGS_DIR=/app/logs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ../dist/jobs:/app/jobs
+      - ../dist/logs:/app/logs

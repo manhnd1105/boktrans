@@ -1,6 +1,7 @@
 """Telegram bot entry point. Run with: python bot.py"""
 import asyncio
 import logging
+import logging.handlers
 import os
 import threading
 from pathlib import Path
@@ -11,7 +12,17 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pipeline import cleanup_job, run_job
 from translator import parse_chapters_arg
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+_LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
+LOGS_DIR = Path(os.environ.get("LOGS_DIR", str(Path(__file__).parent.parent / "dist" / "logs")))
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
+_file_handler = logging.handlers.RotatingFileHandler(
+    LOGS_DIR / "bot.log", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+logging.getLogger().addHandler(_file_handler)
+
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
