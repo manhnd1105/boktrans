@@ -62,6 +62,20 @@ def _fetch_chapter(
 
 
 class TruyenfullScraper:
+    def get_book_info(self, book_url: str) -> dict:
+        """Return {"slug": ..., "author": ..., "dir_name": ...} from the book listing page."""
+        slug_match = re.search(r'truyenfull\.vision/([^/?#]+)', book_url)
+        slug = slug_match.group(1).strip("/") if slug_match else "unknown"
+        try:
+            session = make_session()
+            resp = polite_get(session, book_url)
+            author_match = re.search(r'truyenfull\.vision/tac-gia/([^/"]+)/', resp.text)
+            author = author_match.group(1).strip("/") if author_match else None
+        except Exception:
+            author = None
+        dir_name = f"{slug}-{author}" if author else slug
+        return {"slug": slug, "author": author, "dir_name": dir_name}
+
     def scrape(
         self,
         book_url: str,

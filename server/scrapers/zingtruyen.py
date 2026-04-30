@@ -85,7 +85,26 @@ def _group_range(url: str) -> tuple[int, int] | None:
     return start, end
 
 
+def _parse_author_slug(html: str) -> str | None:
+    m = re.search(r'zingtruyen\.store/author/([^/"]+)', html)
+    return m.group(1).strip("/") if m else None
+
+
 class ZingtruyenScraper:
+    def get_book_info(self, book_url: str) -> dict:
+        """Return {"slug": ..., "author": ..., "dir_name": ...} from the book listing page."""
+        m = re.search(r'zingtruyen\.store/(?:story/)?([^/?#]+)', book_url)
+        slug = m.group(1).strip("/") if m else "unknown"
+        try:
+            session = make_session()
+            resp = polite_get(session, book_url)
+            author = _parse_author_slug(resp.text)
+        except Exception:
+            author = None
+        dir_name = f"{slug}-{author}" if author else slug
+        return {"slug": slug, "author": author, "dir_name": dir_name}
+
+
     def scrape(
         self,
         book_url: str,

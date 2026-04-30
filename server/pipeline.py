@@ -2,7 +2,6 @@
 import os
 import shutil
 import subprocess
-import uuid
 from collections.abc import Callable
 from pathlib import Path
 
@@ -42,15 +41,17 @@ def run_job(
     chapter_filter: set[int] | None = None,
 ) -> Path:
     """Run the full pipeline for book_url. Returns path to the generated epub."""
-    job_id = uuid.uuid4().hex[:8]
-    job_dir = JOBS_DIR / job_id
+    scraper = detect_scraper(book_url)
+    book_info = scraper.get_book_info(book_url)
+    job_dir = JOBS_DIR / book_info["dir_name"]
+    job_existed = job_dir.exists()
     input_dir = job_dir / "input"
     output_dir = job_dir / "output"
     input_dir.mkdir(parents=True, exist_ok=True)
+    progress_cb(f"Found: {book_info['dir_name']}")
 
     try:
         progress_cb(f"Scraping {book_url}...")
-        scraper = detect_scraper(book_url)
         scraper.scrape(book_url, input_dir, progress_cb, chapter_filter)
 
         progress_cb("Translating chapters...")
@@ -69,7 +70,8 @@ def run_job(
         return book_md
 
     except Exception:
-        shutil.rmtree(job_dir, ignore_errors=True)
+        if not job_existed:
+            shutil.rmtree(job_dir, ignore_errors=True)
         raise
 
 

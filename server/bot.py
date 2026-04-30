@@ -76,7 +76,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     ),
                     loop,
                 ).result(timeout=120)
-            cleanup_job(epub_path)
+            # cleanup_job(epub_path)
         except Exception as e:
             logger.exception("Job failed for %s", book_url)
             send(f"Lỗi: {e}")
