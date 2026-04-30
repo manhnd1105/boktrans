@@ -12,6 +12,11 @@ on:
         - info
         - warning
         - debug
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
 
 env:
   REGISTRY: ghcr.io
