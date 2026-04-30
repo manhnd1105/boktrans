@@ -1,6 +1,7 @@
 """AI translation: loops over input/*.md, translates each to output/*.md."""
 import os
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,6 +18,21 @@ MODEL_NAME = os.environ.get("MODEL_NAME", MODELS[2])
 MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "openai")
 MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://localhost:20128/v1")
 MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "anything")
+
+
+def parse_chapters_arg(chapters_arg: str) -> set[int] | None:
+    """Parse '1-50' or '1,2,3' into a set of ints; None means no filter."""
+    if not chapters_arg:
+        return None
+    result: set[int] = set()
+    for part in chapters_arg.split(","):
+        part = part.strip()
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            result.update(range(int(lo), int(hi) + 1))
+        else:
+            result.add(int(part))
+    return result
 
 
 def _make_model(model_name: str):
@@ -53,12 +69,21 @@ def translate_all(
     input_dir: Path,
     output_dir: Path,
     progress_cb: Callable[[str], None] = print,
+    chapter_filter: set[int] | None = None,
 ) -> int:
-    """Translate all chapters in input_dir to output_dir. Returns count of translated files."""
+    """Translate chapters in input_dir to output_dir. Returns count of translated files."""
+    import re
     template = PROMPT_FILE.read_text(encoding="utf-8")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    chapter_files = sorted(input_dir.glob("ch_*.md"))
+    all_files = sorted(input_dir.glob("ch_*.md"))
+    if chapter_filter is not None:
+        chapter_files = [
+            p for p in all_files
+            if (m := re.search(r'ch_(\d+)\.md$', p.name)) and int(m.group(1)) in chapter_filter
+        ]
+    else:
+        chapter_files = all_files
     total = len(chapter_files)
     if total == 0:
         raise RuntimeError(f"No chapters found in {input_dir}")
@@ -67,24 +92,27 @@ def translate_all(
     for i, path in enumerate(chapter_files, start=1):
         out = output_dir / path.name
         if out.exists():
+            progress_cb(f"  [{i}/{total}] {path.name}: already translated, skipping")
             translated += 1
             continue
 
         chapter_text = path.read_text(encoding="utf-8")
         prompt = template.replace("{{CHAPTER_TEXT}}", chapter_text)
 
+        progress_cb(f"  [{i}/{total}] {path.name}: translating ({len(chapter_text)} chars)...")
+        t0 = time.monotonic()
         try:
             result = _call_with_fallback(prompt)
+            elapsed = time.monotonic() - t0
             if _is_too_short(chapter_text, result):
                 progress_cb(f"  [{i}/{total}] {path.name}: translation too short, skipping")
                 continue
             out.write_text(result + "\n", encoding="utf-8")
             translated += 1
+            progress_cb(f"  [{i}/{total}] {path.name}: done ({len(result)} chars, {elapsed:.1f}s)")
         except Exception as e:
-            progress_cb(f"  [{i}/{total}] {path.name}: FAILED — {e}")
+            elapsed = time.monotonic() - t0
+            progress_cb(f"  [{i}/{total}] {path.name}: FAILED after {elapsed:.1f}s — {e}")
             continue
-
-        if i % 50 == 0 or i == total:
-            progress_cb(f"Translated {i} / {total} chapters...")
 
     return translated

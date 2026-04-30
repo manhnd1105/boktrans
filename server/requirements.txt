@@ -2,3 +2,7 @@ python-telegram-bot>=20.0
 langchain
 langchain-openai
 requests
+
+# test dependencies
+pytest
+pytest-mock

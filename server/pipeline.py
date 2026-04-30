@@ -39,6 +39,7 @@ def _to_epub(book_md: Path, book_epub: Path, title: str) -> None:
 def run_job(
     book_url: str,
     progress_cb: Callable[[str], None] = print,
+    chapter_filter: set[int] | None = None,
 ) -> Path:
     """Run the full pipeline for book_url. Returns path to the generated epub."""
     job_id = uuid.uuid4().hex[:8]
@@ -50,22 +51,22 @@ def run_job(
     try:
         progress_cb(f"Scraping {book_url}...")
         scraper = detect_scraper(book_url)
-        scraper.scrape(book_url, input_dir, progress_cb)
+        scraper.scrape(book_url, input_dir, progress_cb, chapter_filter)
 
         progress_cb("Translating chapters...")
-        translate_all(input_dir, output_dir, progress_cb)
+        translate_all(input_dir, output_dir, progress_cb, chapter_filter)
 
         progress_cb("Combining chapters...")
         book_md = job_dir / "book.md"
         _combine(output_dir, book_md)
 
-        progress_cb("Generating EPUB...")
-        book_epub = job_dir / "book.epub"
-        title = book_url.rstrip("/").split("/")[-1].replace("-", " ").title()
-        _to_epub(book_md, book_epub, title)
+        # progress_cb("Generating EPUB...")
+        # book_epub = job_dir / "book.epub"
+        # title = book_url.rstrip("/").split("/")[-1].replace("-", " ").title()
+        # _to_epub(book_md, book_epub, title)
 
         progress_cb("Done.")
-        return book_epub
+        return book_md
 
     except Exception:
         shutil.rmtree(job_dir, ignore_errors=True)

@@ -24,6 +24,7 @@ if [[ "${1:-}" == "--test" ]]; then
     printf "# Chương Test 1\n\nNội dung chương kiểm tra.\n\n---\n\n# Chương Test 2\n\nNội dung chương kiểm tra hai.\n" > "$SAMPLE"
   fi
   pandoc "$SAMPLE" \
+    --from markdown-yaml_metadata_block \
     --metadata title="Dương Thần [TEST]" \
     --metadata lang=vi \
     -o "$OUTPUT_DIR/test.epub"
@@ -37,6 +38,7 @@ else
     exit 1
   fi
   pandoc "$INPUT" \
+    --from markdown-yaml_metadata_block \
     --metadata title="Dương Thần" \
     --metadata author="Dịch thuật AI" \
     --metadata lang=vi \

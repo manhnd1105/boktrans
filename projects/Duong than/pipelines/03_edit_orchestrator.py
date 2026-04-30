@@ -4,9 +4,12 @@ AI editing orchestrator — refines chapters 499-781 to match reference style.
 Uses LangChain init_chat_model pointed at a self-hosted OpenAI-compatible endpoint.
 
 Usage:
-  python 03_edit_orchestrator.py --test      # mock run on fixture, no API call, no writes
-  python 03_edit_orchestrator.py --dry-run   # process one real chapter, print result, no writes
-  python 03_edit_orchestrator.py             # MANUAL: process all pending convert chapters
+  python 03_edit_orchestrator.py --test                      # mock run on fixture, no API call, no writes
+  python 03_edit_orchestrator.py --dry-run                   # process one real chapter, print result, no writes
+  python 03_edit_orchestrator.py --dry-run --chapters 500-510
+  python 03_edit_orchestrator.py                             # MANUAL: process all pending convert chapters
+  python 03_edit_orchestrator.py --chapters 500-600          # MANUAL: process chapters 500–600 only
+  python 03_edit_orchestrator.py --chapters 500,502,510      # MANUAL: process specific chapters
 
 Requirements: pip install langchain langchain-openai
 """
@@ -77,7 +80,22 @@ def is_too_similar(original: str, edited: str) -> bool:
     return ratio > SIMILARITY_THRESHOLD
 
 
-def pending_chapters() -> list[int]:
+def parse_chapters_arg(chapters_arg: str) -> set[int] | None:
+    """Parse '500-600' or '500,501,502' into a set of ints; None means no filter."""
+    if not chapters_arg:
+        return None
+    result = set()
+    for part in chapters_arg.split(","):
+        part = part.strip()
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            result.update(range(int(lo), int(hi) + 1))
+        else:
+            result.add(int(part))
+    return result
+
+
+def pending_chapters(chapter_filter: set[int] | None = None) -> list[int]:
     state = load_state()
     done = set(state["completed"])  # failed chapters are retried on the next run
     result = []
@@ -87,7 +105,7 @@ def pending_chapters() -> list[int]:
         match = re.search(r'ch_(\d+)\.md$', path.name)
         if match:
             num = int(match.group(1))
-            if num not in done:
+            if num not in done and (chapter_filter is None or num in chapter_filter):
                 result.append(num)
     return result
 
@@ -154,9 +172,9 @@ def run_test():
     print("\n[test] PASS — no API calls made, state.json not modified")
 
 
-def run_dry_run():
+def run_dry_run(chapter_filter: set[int] | None = None):
     """Process one real chapter with the model, print result, no file writes."""
-    pending = pending_chapters()
+    pending = pending_chapters(chapter_filter)
     if not pending:
         print("[dry-run] No pending convert chapters found.")
         return
@@ -177,14 +195,14 @@ def run_dry_run():
     print("\n[dry-run] File NOT written — dry-run mode")
 
 
-def run_full():
+def run_full(chapter_filter: set[int] | None = None):
     template = PROMPT_FILE.read_text(encoding="utf-8")
     reference_text = build_reference_text(REFERENCE_CHAPTERS)
     if not reference_text.strip():
         sys.exit("Reference chapters not found. Run pipeline 01 first.")
 
     state = load_state()
-    pending = pending_chapters()
+    pending = pending_chapters(chapter_filter)
 
     print(f"Pending chapters: {len(pending)}")
     print(f"Model: {MODEL_NAME} (with fallback) @ {MODEL_BASE_URL}")
@@ -229,20 +247,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--chapters",
+        metavar="RANGE",
+        help="Limit to specific chapters: '500-600' or '500,501,502'",
+    )
     args = parser.parse_args()
+
+    chapter_filter = parse_chapters_arg(args.chapters)
 
     if args.test:
         run_test()
     elif args.dry_run:
-        run_dry_run()
+        run_dry_run(chapter_filter)
     else:
-        pending = pending_chapters()
+        pending = pending_chapters(chapter_filter)
         print(f"Chapters pending AI editing: {len(pending)}")
         confirm = input("Review prompts/edit_style_match.md first. Proceed with real API calls? [y/N] ")
         if confirm.lower() != "y":
             print("Aborted.")
         else:
-            run_full()
+            run_full(chapter_filter)
 
 
 if __name__ == "__main__":
