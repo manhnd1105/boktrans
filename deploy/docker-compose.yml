@@ -3,6 +3,7 @@ services:
     build:
       context: ..
       dockerfile: src/Dockerfile
+    image: ${REGISTRY}/${IMAGE_NAME}:main
     restart: unless-stopped
     env_file: .env
     environment:

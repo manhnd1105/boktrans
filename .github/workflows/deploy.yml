@@ -10,6 +10,10 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   deploy:
     environment: VM_HOST
@@ -17,18 +21,44 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure deployment directory
+        run: |
+          mkdir -p ${{ vars.VM_DEPLOY_PATH }}
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            cd ${{ secrets.VM_DEPLOY_PATH }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+      - name: Sync configuration to VM
+        run: |
+          cp deploy/docker-compose.yml ${{ vars.VM_DEPLOY_PATH }}/docker-compose.yml
+            
+      - name: Deploy application
+        run: |
+          cd ${{ vars.VM_DEPLOY_PATH }}
+          export REGISTRY=${{ env.REGISTRY }}
+          export IMAGE_NAME=${{ env.IMAGE_NAME }}
+          docker compose pull
+          docker compose up -d --remove-orphans
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1.2.0
+      #   with:
+      #     host: ${{ env.VM_HOST }}
+      #     username: ${{ env.VM_USER }}
+      #     key: ${{ secrets.VM_SSH_KEY }}
+      #     script: |
+      #       cd ${{ env.VM_DEPLOY_PATH }}
 
-            docker compose pull
-            docker compose up -d --remove-orphans
+      #       echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ env.GHCR_USER }} --password-stdin
 
-            docker image prune -f
+      #       docker compose pull
+      #       docker compose up -d --remove-orphans
+
+      #       docker image prune -f
