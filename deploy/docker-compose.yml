@@ -5,11 +5,19 @@ services:
       dockerfile: src/Dockerfile
     image: ${REGISTRY}/${IMAGE_NAME}:main
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - LOGS_DIR=/app/logs
+      - TELEGRAM_BOT_TOKEN
+      - MODEL_API_KEY
+      - MODEL_PROVIDER
+      - MODEL_BASE_URL
+      - MODEL_NAME
+      - LOGS_DIR=${LOGS_DIR:-/app/logs}
+      - JOBS_DIR=${JOBS_DIR:-/app/jobs}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ../dist/jobs:/app/jobs
-      - ../dist/logs:/app/logs
+      - ${JOBS_VOLUME_PATH:-../dist/jobs}:/app/jobs
+      - ${LOGS_VOLUME_PATH:-../dist/logs}:/app/logs

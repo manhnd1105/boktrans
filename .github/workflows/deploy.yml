@@ -41,6 +41,14 @@ jobs:
           cp deploy/docker-compose.yml ${{ vars.VM_DEPLOY_PATH }}/docker-compose.yml
             
       - name: Deploy application
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          MODEL_PROVIDER: ${{ vars.MODEL_PROVIDER }}
+          MODEL_BASE_URL: ${{ vars.MODEL_BASE_URL }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          JOBS_VOLUME_PATH: ${{ vars.JOBS_VOLUME_PATH }}
+          LOGS_VOLUME_PATH: ${{ vars.LOGS_VOLUME_PATH }}
         run: |
           cd ${{ vars.VM_DEPLOY_PATH }}
           export REGISTRY=${{ env.REGISTRY }}
